@@ -10,14 +10,14 @@ from datetime import datetime, timezone
 import random
 import string
 
-# Hardcoded credentials (SECURITY RISK: Keep this safe!)
+# Hardcoded credentials (too lazy to make it a environment variable_
 TOKEN = "DiscordBotToken"
 CLOUDFLARE_API_KEY = "CloudflareAPIKey"
 CLOUDFLARE_EMAIL = "MailOfOwnerAPIKey"
 ZONE_ID = "ZoneIDOfBaseDomain"
 BASE_DOMAIN = "BaseDomain"
 
-# Bot setup with the correct intents
+#bot setup
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
@@ -25,16 +25,14 @@ intents.guilds = True
 intents.members = True
 intents.dm_messages = True
 
-# Create the bot
 bot = commands.Bot(command_prefix="%", intents=intents)
 
-# Data persistence
 DATA_FILE = "users.json"
 
-# Record types
+# Allowed records
 RECORD_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV"]
 
-# Colors
+#Other bot things
 SUCCESS_COLOR = 0x4CAF50  # Green
 ERROR_COLOR = 0xF44336    # Red
 INFO_COLOR = 0x2196F3     # Blue
@@ -60,14 +58,12 @@ def save_data(data):
     except Exception as e:
         print(f"Error saving data: {str(e)}")
 
-# Cloudflare API headers
 headers = {
     "X-Auth-Email": CLOUDFLARE_EMAIL,
     "X-Auth-Key": CLOUDFLARE_API_KEY,
     "Content-Type": "application/json"
 }
 
-# Helper functions
 def is_valid_subdomain(name):
     """Check if subdomain name is valid (alphanumeric and hyphen only)"""
     return bool(re.match(r'^[a-zA-Z0-9-]+$', name))
@@ -84,7 +80,6 @@ def is_valid_hostname(hostname):
     """Check if hostname is valid"""
     return bool(re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$', hostname))
 
-# User's active sessions for record management
 active_sessions = {}
 
 @bot.event
@@ -98,7 +93,6 @@ async def on_ready():
     await bot.change_presence(activity=activity)
     print('------')
 
-# Test command to check if the bot is responding
 @bot.command(name="ping")
 async def ping(ctx):
     embed = discord.Embed(
@@ -110,11 +104,9 @@ async def ping(ctx):
     embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
     await ctx.send(embed=embed)
 
-# Admin check function
 def is_admin(ctx):
     return ctx.author.guild_permissions.administrator
 
-# Commands list
 @bot.command()
 async def commands(ctx):
     embed = discord.Embed(
@@ -124,19 +116,15 @@ async def commands(ctx):
         timestamp=datetime.now(timezone.utc)
     )
 
-    # General commands
     embed.add_field(name="General", value="`%ping` - Check if the bot is responding\n`%balance` - Check your credit balance", inline=False)
 
-    # Domain commands
     embed.add_field(name="Domain Management", value="`%create_subdomain name` - Create a subdomain (costs 10 credits)\n`%list_subdomains` - List all your subdomains\n`%records` - Interactive DNS record management", inline=False)
 
-    # Admin commands
     embed.add_field(name="Admin Commands", value="`%add_credits @user amount` - Add credits to a user\n`%remove_subdomain name @user` - Remove a user's subdomain\n`%remove_credits @user amount` - Remove credits from a user\n`%reset_all` - Reset all user data (requires confirmation string)", inline=False)
 
     embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
     await ctx.send(embed=embed)
 
-# Check user balance
 @bot.command()
 async def balance(ctx):
     try:
@@ -158,7 +146,6 @@ async def balance(ctx):
         print(f"Error in balance command: {str(e)}")
         await ctx.send(embed=discord.Embed(title="❌ Error", description="An error occurred while checking your balance.", color=ERROR_COLOR))
 
-# Admin: Add credits
 @bot.command()
 async def add_credits(ctx, member: discord.Member, amount: int):
     try:
@@ -185,7 +172,6 @@ async def add_credits(ctx, member: discord.Member, amount: int):
         print(f"Error in add_credits command: {str(e)}")
         await ctx.send(embed=discord.Embed(title="❌ Error", description="An error occurred while adding credits.", color=ERROR_COLOR))
 
-# Admin: Remove credits
 @bot.command()
 async def remove_credits(ctx, member: discord.Member, amount: int):
     try:
@@ -216,7 +202,6 @@ async def remove_credits(ctx, member: discord.Member, amount: int):
         print(f"Error in remove_credits command: {str(e)}")
         await ctx.send(embed=discord.Embed(title="❌ Error", description="An error occurred while removing credits.", color=ERROR_COLOR))
 
-# Admin: Remove subdomain
 @bot.command()
 async def remove_subdomain(ctx, name: str, member: discord.Member = None):
     try:
@@ -231,7 +216,6 @@ async def remove_subdomain(ctx, name: str, member: discord.Member = None):
             embed = discord.Embed(title="❌ Not Found", description=f"Subdomain not found for {target_user.mention}.", color=ERROR_COLOR)
             return await ctx.send(embed=embed)
 
-        # Get record ID from Cloudflare
         subdomain = f"{name}.{BASE_DOMAIN}"
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
@@ -252,7 +236,6 @@ async def remove_subdomain(ctx, name: str, member: discord.Member = None):
             save_data(users)
             return await ctx.send(embed=embed)
 
-        # Delete all associated records
         deleted_count = 0
         for record in records_to_delete:
             delete_response = requests.delete(
@@ -263,7 +246,6 @@ async def remove_subdomain(ctx, name: str, member: discord.Member = None):
             if delete_response.status_code == 200 and delete_response.json().get("success"):
                 deleted_count += 1
 
-        # Remove from user's list
         users[user_id]["subdomains"].remove(name)
         save_data(users)
 
@@ -276,7 +258,6 @@ async def remove_subdomain(ctx, name: str, member: discord.Member = None):
         embed.set_footer(text=f"Action by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
         await ctx.send(embed=embed)
 
-        # Notify user if it's not the person who triggered the command
         if target_user != ctx.author:
             try:
                 user_embed = discord.Embed(
@@ -287,13 +268,12 @@ async def remove_subdomain(ctx, name: str, member: discord.Member = None):
                 )
                 await target_user.send(embed=user_embed)
             except:
-                pass  # User might have DMs disabled
+                pass
 
     except Exception as e:
         print(f"Error in remove_subdomain command: {str(e)}")
         await ctx.send(embed=discord.Embed(title="❌ Error", description=f"Error removing subdomain: {str(e)}", color=ERROR_COLOR))
 
-# Admin: Reset all user data
 @bot.command()
 async def reset_all(ctx):
     try:
@@ -335,7 +315,6 @@ async def reset_all(ctx):
         print(f"Error in reset_all command: {str(e)}")
         await ctx.send(embed=discord.Embed(title="❌ Error", description="An error occurred while resetting all user data.", color=ERROR_COLOR))
 
-# Create subdomain
 @bot.command()
 async def create_subdomain(ctx, name: str):
     try:
@@ -355,7 +334,6 @@ async def create_subdomain(ctx, name: str):
             )
             return await ctx.send(embed=embed)
 
-        # Check if subdomain exists
         subdomain = f"{name}.{BASE_DOMAIN}"
 
         response = requests.get(
@@ -373,17 +351,15 @@ async def create_subdomain(ctx, name: str):
             embed = discord.Embed(title="⚠️ Already Exists", description=f"Subdomain {subdomain} already exists.", color=WARNING_COLOR)
             return await ctx.send(embed=embed)
 
-        # Check if the subdomain is being created on an existing subdomain or root
         existing_subdomains = users[user_id]["subdomains"]
         if any(subdomain.startswith(f"{existing}.{BASE_DOMAIN}") for existing in existing_subdomains) or name == BASE_DOMAIN:
             embed = discord.Embed(title="❌ Invalid Subdomain", description="You cannot create a subdomain on an existing subdomain or the root domain.", color=ERROR_COLOR)
             return await ctx.send(embed=embed)
 
-        # Create subdomain
         data = {
             "type": "A",
             "name": subdomain,
-            "content": "1.2.3.4",  # Default IP
+            "content": "1.2.3.4",
             "ttl": 1,
             "proxied": False
         }
@@ -421,7 +397,6 @@ async def create_subdomain(ctx, name: str):
         embed = discord.Embed(title="❌ Error", description=f"Error creating subdomain: {str(e)}", color=ERROR_COLOR)
         await ctx.send(embed=embed)
 
-# List subdomains
 @bot.command()
 async def list_subdomains(ctx):
     try:
@@ -453,14 +428,12 @@ async def list_subdomains(ctx):
         embed = discord.Embed(title="❌ Error", description="An error occurred while listing your subdomains.", color=ERROR_COLOR)
         await ctx.send(embed=embed)
 
-# Record management in DM
 @bot.command()
 async def records(ctx):
     """Interactive DNS record management through DMs"""
     try:
         user_id = str(ctx.author.id)
 
-        # Send initial response in the channel
         initial_embed = discord.Embed(
             title="📬 Check Your DMs",
             description="I've sent you a private message to manage your DNS records.",
@@ -468,7 +441,6 @@ async def records(ctx):
         )
         await ctx.send(embed=initial_embed)
 
-        # Check if user has subdomains
         if user_id not in users or not users[user_id].get("subdomains"):
             no_domains_embed = discord.Embed(
                 title="❌ No Subdomains",
@@ -477,13 +449,11 @@ async def records(ctx):
             )
             return await ctx.author.send(embed=no_domains_embed)
 
-        # Initialize session
         active_sessions[user_id] = {
             "step": "select_domain",
             "data": {}
         }
 
-        # Ask user to select a domain
         subdomains = users[user_id]["subdomains"]
         domain_embed = discord.Embed(
             title="🌐 DNS Record Management",
@@ -510,28 +480,22 @@ async def records(ctx):
         error_embed = discord.Embed(title="❌ Error", description="An error occurred while setting up record management.", color=ERROR_COLOR)
         await ctx.send(embed=error_embed)
 
-# Process DMs for record management
 @bot.event
 async def on_message(message):
-    # Don't process our own messages
     if message.author == bot.user:
         return
 
-    # Process commands first
     await bot.process_commands(message)
 
-    # Only process DMs for record management
     if not isinstance(message.channel, discord.DMChannel):
         return
 
     user_id = str(message.author.id)
 
-    # Check if user has an active session
     if user_id in active_sessions:
         session = active_sessions[user_id]
         content = message.content.strip().lower()
 
-        # Cancel option
         if content == "cancel":
             await message.author.send(embed=discord.Embed(
                 title="✅ Cancelled",
@@ -541,7 +505,6 @@ async def on_message(message):
             del active_sessions[user_id]
             return
 
-        # Process based on current step
         if session["step"] == "select_domain":
             await process_domain_selection(message, user_id)
         elif session["step"] == "select_action":
@@ -586,12 +549,10 @@ async def process_domain_selection(message, user_id):
             ))
             return
 
-        # Store selected domain
         selected_domain = subdomains[selection - 1]
         session["data"]["domain"] = selected_domain
         session["step"] = "select_action"
 
-        # Show action options
         action_embed = discord.Embed(
             title=f"🔧 Managing {selected_domain}.{BASE_DOMAIN}",
             description="What would you like to do?",
@@ -615,11 +576,9 @@ async def process_action_selection(message, user_id):
         content = message.content.strip()
 
         if content == "1":
-            # List records
             session["step"] = "list_records"
             await list_domain_records(message.author, user_id)
         elif content == "2":
-            # Add record
             session["step"] = "create_record_type"
             type_embed = discord.Embed(
                 title="🆕 Create DNS Record",
@@ -647,11 +606,9 @@ async def process_action_selection(message, user_id):
             type_embed.set_footer(text="Type 'cancel' to exit")
             await message.author.send(embed=type_embed)
         elif content == "3":
-            # Edit record
             session["step"] = "select_record_to_edit"
             await list_domain_records_for_edit(message.author, user_id)
         elif content == "4":
-            # Delete record
             session["step"] = "select_record_to_delete"
             await list_domain_records_for_deletion(message.author, user_id)
         else:
@@ -671,7 +628,6 @@ async def list_domain_records(user, user_id):
         domain = session["data"]["domain"]
         subdomain = f"{domain}.{BASE_DOMAIN}"
 
-        # Fetch records from Cloudflare
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
             headers=headers
@@ -720,7 +676,6 @@ async def list_domain_records(user, user_id):
             records_embed.set_footer(text="Type 'back' to return to action selection or 'cancel' to exit")
             await user.send(embed=records_embed)
 
-        # Offer to go back
         session["step"] = "list_records"
     except Exception as e:
         print(f"Error in list_domain_records: {str(e)}")
@@ -733,7 +688,6 @@ async def process_records_list(message, user_id):
         session = active_sessions[user_id]
         session["step"] = "select_action"
 
-        # Show action options again
         selected_domain = session["data"]["domain"]
         action_embed = discord.Embed(
             title=f"🔧 Managing {selected_domain}.{BASE_DOMAIN}",
@@ -771,7 +725,6 @@ async def process_create_record_type(message, user_id):
             ))
             return
 
-        # Store selected record type
         record_type = RECORD_TYPES[selection - 1]
         session["data"]["record_type"] = record_type
 
@@ -815,7 +768,6 @@ async def process_create_record_name(message, user_id):
         session["data"]["record_name"] = record_name
         session["step"] = "confirm_create"
 
-        # Confirm creation
         confirm_embed = discord.Embed(
             title="🆕 Create DNS Record",
             description=f"Please confirm the creation of the {record_type} record with the following details:",
@@ -847,7 +799,6 @@ async def process_create_cname_target(message, user_id):
         session["data"]["cname_target"] = target_domain
         session["step"] = "confirm_create"
 
-        # Confirm creation
         confirm_embed = discord.Embed(
             title="🆕 Create DNS Record",
             description=f"Please confirm the creation of the CNAME record with the following details:",
@@ -931,7 +882,6 @@ async def process_record_deletion(message, user_id):
         domain = session["data"]["domain"]
         subdomain = f"{domain}.{BASE_DOMAIN}"
 
-        # Fetch records from Cloudflare
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
             headers=headers
@@ -958,7 +908,6 @@ async def process_record_deletion(message, user_id):
             del active_sessions[user_id]
             return
 
-        # List records for deletion
         delete_embed = discord.Embed(
             title="🗑️ Delete DNS Record",
             description=f"Select a record to delete for {subdomain}:",
@@ -1032,7 +981,6 @@ async def process_record_edit_selection(message, user_id):
         domain = session["data"]["domain"]
         subdomain = f"{domain}.{BASE_DOMAIN}"
 
-        # Fetch records from Cloudflare
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
             headers=headers
@@ -1059,7 +1007,6 @@ async def process_record_edit_selection(message, user_id):
             del active_sessions[user_id]
             return
 
-        # List records for editing
         edit_embed = discord.Embed(
             title="✏️ Edit DNS Record",
             description=f"Select a record to edit for {subdomain}:",
@@ -1103,7 +1050,6 @@ async def process_edit_record_content(message, user_id):
         session["data"]["record_id"] = record["id"]
         session["step"] = "confirm_edit"
 
-        # Ask for new content
         edit_embed = discord.Embed(
             title="✏️ Edit DNS Record",
             description=f"Enter the new content for the {record['type']} record:",
@@ -1122,7 +1068,6 @@ async def process_confirm_edit(message, user_id):
         new_content = message.content.strip()
         record_id = session["data"]["record_id"]
 
-        # Fetch the existing record
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records/{record_id}",
             headers=headers
@@ -1156,7 +1101,6 @@ async def process_confirm_edit(message, user_id):
             ))
             return
 
-        # Update the record
         data = {
             "type": record_type,
             "name": record["name"],
@@ -1197,7 +1141,6 @@ async def list_domain_records_for_edit(user, user_id):
         domain = session["data"]["domain"]
         subdomain = f"{domain}.{BASE_DOMAIN}"
 
-        # Fetch records from Cloudflare
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
             headers=headers
@@ -1224,7 +1167,6 @@ async def list_domain_records_for_edit(user, user_id):
             del active_sessions[user_id]
             return
 
-        # List records for editing
         edit_embed = discord.Embed(
             title="✏️ Edit DNS Record",
             description=f"Select a record to edit for {subdomain}:",
@@ -1253,7 +1195,6 @@ async def list_domain_records_for_deletion(user, user_id):
         domain = session["data"]["domain"]
         subdomain = f"{domain}.{BASE_DOMAIN}"
 
-        # Fetch records from Cloudflare
         response = requests.get(
             f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records",
             headers=headers
@@ -1280,7 +1221,6 @@ async def list_domain_records_for_deletion(user, user_id):
             del active_sessions[user_id]
             return
 
-        # List records for deletion
         delete_embed = discord.Embed(
             title="🗑️ Delete DNS Record",
             description=f"Select a record to delete for {subdomain}:",
@@ -1303,7 +1243,7 @@ async def list_domain_records_for_deletion(user, user_id):
         await user.send(embed=discord.Embed(title="❌ Error", description="An error occurred while processing the record deletion selection.", color=ERROR_COLOR))
         del active_sessions[user_id]
 
-# Run the bot
+# Loop
 try:
     bot.run(TOKEN)
 except discord.errors.LoginFailure:
